@@ -145,59 +145,9 @@ st.markdown("""
     .st-emotion-cache-1cflm81 {
         padding-top: 29px;
     }
-    
-    /* --- NUOVI STILI PER STAMPA E BOTTONE STAMPA --- */
-    
-    /* Stile per il nuovo pulsante di stampa */
-    .print-button {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        border: 1px solid #CCCCCC !important;
-        padding: 8px 16px;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        width: 100%;
-        margin-top: 10px; /* Aggiunge spazio sopra il pulsante */
-    }
-    .print-button:hover {
-        background-color: #F0F0F0 !important;
-    }
-
-    /* Logica di stampa: nasconde tutto tranne l'area stampabile */
-    @media print {
-      body * {
-        visibility: hidden !important;
-        display: none !important;
-      }
-      #printable-area, #printable-area * {
-        visibility: visible !important;
-        display: block !important;
-      }
-      #printable-area {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important; /* Adatta alla larghezza della pagina */
-        padding: 20px !important;
-        font-family: Arial, sans-serif !important;
-        color: #000000 !important;
-        background: #FFFFFF !important;
-      }
-      h1, h2, h3, p, li, b {
-        color: #000000 !important;
-      }
-      /* Nasconde i bottoni "Info" e "X" nella stampa */
-      div[data-testid="stButton"], div[data-testid="stPopover"], .print-button {
-        display: none !important;
-      }
-    }
-    /* --- FINE NUOVI STILI --- */
-    
     </style>
     """, unsafe_allow_html=True)
 
-# Modificato il titolo per la versione Beta
 st.title("⚖️ Calcolatore Prescrizione Reati (BETA)")
 
 # --- Inizializza session_state per sospensioni ---
@@ -233,31 +183,10 @@ with col2:
 st.subheader("3. Qualifiche e Recidiva")
 c1, c2, c3 = st.columns(3)
 with c1:
-    # --- MODIFICA: Aggiunto Popover per Info Raddoppio ---
-    r_col1, r_col2 = st.columns([4, 1])
-    with r_col1:
-        is_raddoppio = st.checkbox("Raddoppio Termini")
-    with r_col2:
-        with st.popover("Info"):
-            st.markdown("""
-            **Reati con raddoppio dei termini (Art. 157, c. 6 c.p.)**
-            
-            *Elenco non esaustivo, si raccomanda la verifica della norma.*
-            
-            * Associazione di tipo mafioso (art. 416-bis) e reati aggravati ex art. 416-bis.1.
-            * Incendio boschivo (art. 423-bis).
-            * Strage (art. 422).
-            * Epidemia (art. 438).
-            * Omicidio (art. 575).
-            * Delitti in materia di schiavitù, prostituzione minorile, pornografia minorile, violenza sessuale, ecc. (artt. 600, 600-bis, 600-ter, 600-quater, 600-quinquies, 601, 602).
-            * Violenza sessuale (art. 609-bis), anche di gruppo (art. 609-octies).
-            * Atti sessuali con minorenne (art. 609-quater) e corruzione di minorenne (art. 609-quinquies).
-            * Truffa aggravata per il conseguimento di erogazioni pubbliche (art. 640-bis).
-            * Associazione finalizzata al traffico di stupefacenti (art. 74 D.P.R. 309/1990).
-            * Reati in materia di traffico illecito di rifiuti (art. 260 D.Lgs. 152/2006, ex art. 51 D.Lgs. 22/1997).
-            """)
-    # --- FINE MODIFICA ---
     is_tentato = st.checkbox("Reato Tentato (Art. 56)")
+    is_raddoppio = st.checkbox("Raddoppio Termini")
+    # --- MODIFICA: Aggiunto Checkbox per Art. 63 c. 4 ---
+    is_art_63 = st.checkbox("Concorso Aggravanti (Art. 63 c. 4)")
 with c2:
     tipo_reato = st.selectbox("Tipo Reato (Minimo)", ["Delitto (Min 6 anni)", "Contravvenzione (Min 4 anni)"])
     minimo_edittale = 6 if "Delitto" in tipo_reato else 4
@@ -347,6 +276,14 @@ if st.button("CALCOLA PRESCRIZIONE", use_container_width=True, type="primary"):
         aumento_float = pena_base_mesi_float
         pena_base_mesi_float += aumento_float
         logs.append(f"Aumento Abitualità (+100%) su base: +{format_hybrid_time(aumento_float)} -> Nuova base: <b>{format_hybrid_time(pena_base_mesi_float)}</b>")
+
+    # --- MODIFICA: Aggiunto Passo 2.5 per Art. 63 c. 4 ---
+    # Questo aumento si applica sulla pena già aumentata dalla recidiva
+    if is_art_63:
+        aumento_art_63_float = pena_base_mesi_float / 3.0
+        pena_base_mesi_float += aumento_art_63_float
+        logs.append(f"Aumento Concorso Agg. (Art. 63 c. 4): +1/3 (+{format_hybrid_time(aumento_art_63_float)}) -> Nuova base: <b>{format_hybrid_time(pena_base_mesi_float)}</b>")
+    # --- FINE MODIFICA ---
 
     # 3. Tentativo (calcolo su float)
     if is_tentato:
@@ -449,47 +386,4 @@ if st.button("CALCOLA PRESCRIZIONE", use_container_width=True, type="primary"):
         for log in logs:
             st.markdown(f"- {log}", unsafe_allow_html=True)
 
-    # --- MODIFICA: Aggiunta Area Stampabile e Pulsante Stampa ---
-    
-    # 1. Ricrea i log in HTML semplice per la stampa
-    print_logs_html = "<ul>"
-    for log in logs:
-        print_logs_html += f"<li>{log}</li>"
-    print_logs_html += "</ul>"
-    
-    # 2. Crea il contenitore HTML nascosto per la stampa
-    printable_html = f"""
-    <div id="printable-area">
-        <h1 style="font-family: Arial, sans-serif;">Report Calcolo Prescrizione</h1>
-        <p style="font-family: Arial, sans-serif;"><b>Data Commissione Reato:</b> {data_commissione.strftime('%d/%m/%Y')}</p>
-        <hr>
-        
-        <div style="background-color: #fed7aa; border: 1px solid #f9b45f; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 10px; font-family: Arial, sans-serif;">
-            <h3 style="font-size: 16px; font-weight: 600; margin: 0 0 5px 0;">Prescrizione Ordinaria</h3>
-            <p style="font-size: 24px; font-weight: bold; margin: 0;">{data_ord_finale.strftime('%d/%m/%Y')}</p>
-            <small>(da {start_ord.strftime('%d/%m/%Y')})</small>
-        </div>
-        <div style="background-color: #bbf7d0; border: 1px solid #86efac; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 10px; font-family: Arial, sans-serif;">
-            <h3 style="font-size: 16px; font-weight: 600; margin: 0 0 5px 0;">Prescrizione Massima</h3>
-            <p style="font-size: 24px; font-weight: bold; margin: 0;">{data_max_finale.strftime('%d/%m/%Y')}</p>
-            <small>(da {data_commissione.strftime('%d/%m/%Y')})</small>
-        </div>
-        <hr>
-        
-        <h2 style="font-family: Arial, sans-serif;">Passaggi Dettagliati</h2>
-        {print_logs_html}
-        
-        <hr style="margin-top: 20px;">
-        <p style="font-family: Arial, sans-serif; font-size: 12px; color: #555;">
-            App realizzata dal dr. Giampiero Borraccia con Gemini AI
-        </p>
-    </div>
-    """
-    
-    st.markdown(printable_html, unsafe_allow_html=True)
-    
-    # 3. Aggiungi il pulsante di stampa (che usa il CSS @media print)
-    st.markdown('<button onclick="window.print()" class="print-button">🖨️ Stampa Risultati (A4)</button>', unsafe_allow_html=True)
-    # --- FINE MODIFICA ---
-
-st.markdown('<div class="footer-disclaimer">App realizzata dal dr. Giampiero Borraccia con Gemini AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer-disclaimer">App realizzata Giampiero Borraccia (magistrato) con Gemini AI</div>', unsafe_allow_html=True)
